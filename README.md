@@ -1,122 +1,86 @@
 # MWM API
 
-API REST do sistema **Mechanical Workshop Management**, responsável pelos dados da oficina mecânica e pelo acesso do frontend ao PostgreSQL.
+REST API for the Mechanical Workshop Management system. It provides authentication, PostgreSQL persistence, and CRUD operations for the frontend.
 
-## Requisitos
+## Requirements
 
-- Node.js 20 ou superior
-- PostgreSQL 17 ou 18
+- Node.js 20 or newer
+- PostgreSQL 17 or 18
 - npm
 
-## Configuração local
+## Local setup
 
-Instale as dependências:
+Install dependencies:
 
 ```powershell
 npm install
 ```
 
-O arquivo `.env` deve conter a conexão da mesma instância PostgreSQL usada no pgAdmin:
+Configure `.env` with the same PostgreSQL instance used by pgAdmin:
 
 ```env
 PORT=3000
 DATABASE_URL=postgresql://postgres:root@localhost:5432/mwm
 JWT_SECRET=dev-only-change-before-production
 JWT_EXPIRES_IN=8h
-CORS_ORIGIN=http://localhost:5500
+CORS_ORIGIN=http://localhost:5500,http://localhost:5173
 ```
 
-> Use a mesma porta, versão/instância e banco no pgAdmin e na `DATABASE_URL`. Se o pgAdmin estiver conectado a outra instalação do PostgreSQL, ele poderá mostrar dados diferentes.
-
-Crie o banco caso ele ainda não exista:
+Create the database if necessary, then apply the schema and development seed:
 
 ```powershell
 $env:PGPASSWORD = 'root'
 & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -d postgres -c "CREATE DATABASE mwm;"
-```
-
-Execute a estrutura e o seed:
-
-```powershell
-$env:PGPASSWORD = 'root'
 & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -d mwm -f db\database.sql
 ```
 
-Se a instalação correta for PostgreSQL 18, troque `PostgreSQL\17` por `PostgreSQL\18` nos comandos. O banco de desenvolvimento é criado com:
+If PostgreSQL 18 is the instance used by pgAdmin, replace `PostgreSQL\17` with `PostgreSQL\18`. The API and pgAdmin must use the same host, port, database, and PostgreSQL instance.
 
-- Cliente: João da Silva e Robson
-- Funcionário: Carlos Oliveira
-- Veículo: Volkswagen Gol, placa `ABC1D23`
-- Ordem: Revisão geral
-- Usuário: `admin@oficina.com`
+The development seed includes two clients, one staff member, one vehicle, one service order, and the login user `admin@oficina.com` with password `senha-segura`.
 
-## Executar a API
+## Run the API
 
 ```powershell
 npm start
 ```
 
-Durante o desenvolvimento, com reinício automático:
+Development mode with automatic restart:
 
 ```powershell
 npm run dev
 ```
 
-Base da API:
+Base URL: `http://localhost:3000/api/v1`
 
-```text
-http://localhost:3000/api/v1
-```
+Health check: `GET http://localhost:3000/health`
 
-Teste rápido:
-
-```text
-GET http://localhost:3000/health
-```
-
-Resposta esperada:
-
-```json
-{
-	"status": "ok",
-	"database": "ok"
-}
-```
-
-## Autenticação
-
-Faça login:
+## Authentication
 
 ```http
-POST http://localhost:3000/api/v1/auth/login
+POST /api/v1/auth/login
 Content-Type: application/json
 ```
 
 ```json
 {
-	"email": "admin@oficina.com",
-	"senha": "senha-segura"
+  "email": "admin@oficina.com",
+  "senha": "senha-segura"
 }
 ```
 
-A resposta contém `access_token`. Envie esse token em todas as rotas protegidas:
+Send the returned token with every protected request:
 
 ```http
-Authorization: Bearer SEU_ACCESS_TOKEN
+Authorization: Bearer YOUR_ACCESS_TOKEN
 ```
 
-Também estão disponíveis:
+Additional endpoints: `GET /api/v1/auth/me` and `POST /api/v1/auth/logout`.
 
-```text
-GET  /api/v1/auth/me
-POST /api/v1/auth/logout
-```
+## Resources
 
-## Recursos disponíveis
+All resource routes require authentication. Staff management requires the `admin` profile.
 
-Todas as rotas abaixo exigem autenticação, salvo `/health` e o login.
-
-### Clientes
+### Clients
 
 ```text
 GET    /api/v1/clientes
@@ -127,19 +91,17 @@ DELETE /api/v1/clientes/:id
 GET    /api/v1/clientes/:cliente_id/veiculos
 ```
 
-Exemplo de criação:
-
 ```json
 {
-	"nome": "Maria Oliveira",
-	"cpf_cnpj": "111.222.333-44",
-	"email": "maria@example.com",
-	"telefone": "(49) 99999-9999",
-	"endereco": "Rua Central, 50"
+  "nome": "Maria Oliveira",
+  "cpf_cnpj": "111.222.333-44",
+  "email": "maria@example.com",
+  "telefone": "(49) 99999-9999",
+  "endereco": "Central Street, 50"
 }
 ```
 
-### Funcionários
+### Staff
 
 ```text
 GET    /api/v1/funcionarios
@@ -149,17 +111,15 @@ PATCH  /api/v1/funcionarios/:id
 DELETE /api/v1/funcionarios/:id
 ```
 
-Essas operações exigem perfil `admin`.
-
 ```json
 {
-	"nome": "Ana Souza",
-	"cargo": "Mecânica",
-	"matricula": "FUNC002"
+  "nome": "Ana Souza",
+  "cargo": "Mechanic",
+  "matricula": "FUNC002"
 }
 ```
 
-### Veículos
+### Vehicles
 
 ```text
 GET    /api/v1/veiculos
@@ -169,24 +129,20 @@ PATCH  /api/v1/veiculos/:id
 DELETE /api/v1/veiculos/:id
 ```
 
-Exemplo de criação:
-
 ```json
 {
-	"cliente_id": 1,
-	"placa": "XYZ2A34",
-	"marca": "Fiat",
-	"modelo": "Uno",
-	"cor": "Branco",
-	"quilometragem": 45000,
-	"ultima_visita": "2026-09-07",
-	"carroceria": "Hatch"
+  "cliente_id": 1,
+  "placa": "XYZ2A34",
+  "marca": "Fiat",
+  "modelo": "Uno",
+  "cor": "White",
+  "quilometragem": 45000,
+  "ultima_visita": "2026-09-07",
+  "carroceria": "Hatch"
 }
 ```
 
-A placa é convertida para maiúsculas. O `cliente_id` deve existir.
-
-### Ordens de serviço
+### Service orders
 
 ```text
 GET    /api/v1/ordens-servico
@@ -197,81 +153,26 @@ PATCH  /api/v1/ordens-servico/:id/status
 DELETE /api/v1/ordens-servico/:id
 ```
 
-Exemplo de criação:
-
 ```json
 {
-	"titulo": "Revisão geral",
-	"cliente_id": 1,
-	"veiculo_id": 1,
-	"responsavel_id": 1,
-	"status": "em_andamento",
-	"data_inicio": "2026-09-07T08:30:00-03:00",
-	"observacao": "Verificar freios e óleo.",
-	"valor": 120.00
+  "titulo": "General inspection",
+  "cliente_id": 1,
+  "veiculo_id": 1,
+  "responsavel_id": 1,
+  "status": "em_andamento",
+  "data_inicio": "2026-09-07T08:30:00-03:00",
+  "observacao": "Check brakes and oil.",
+  "valor": 120.00
 }
 ```
 
-Status permitidos: `pendente`, `em_andamento` e `finalizado`.
+Valid statuses are `pendente`, `em_andamento`, and `finalizado`. When an order is finalized, the API fills `data_fim` and calculates `tempo_decorrido_minutos`.
 
-Para finalizar uma ordem:
+## Pagination and filters
 
-```http
-PATCH /api/v1/ordens-servico/1/status
-Content-Type: application/json
-Authorization: Bearer SEU_ACCESS_TOKEN
-```
+List responses use `{ "data": [], "meta": { "page": 1, "limit": 20, "total": 0, "pages": 0 } }`.
 
-```json
-{
-	"status": "finalizado"
-}
-```
-
-A API preenche `data_fim` e calcula `tempo_decorrido_minutos` automaticamente.
-
-## Listagens, filtros e paginação
-
-As listagens retornam:
-
-```json
-{
-	"data": [],
-	"meta": {
-		"page": 1,
-		"limit": 20,
-		"total": 0,
-		"pages": 0
-	}
-}
-```
-
-Clientes, funcionários e veículos aceitam:
-
-```text
-?page=1&limit=20&search=fiat
-```
-
-Veículos também aceitam:
-
-```text
-?cliente_id=1
-```
-
-Ordens de serviço aceitam:
-
-```text
-?status=em_andamento
-&cliente_id=1
-&veiculo_id=1
-&responsavel_id=1
-&data_inicio_de=2026-09-01
-&data_inicio_ate=2026-09-30
-&valor_min=50
-&valor_max=500
-&sort=data_inicio_desc
-&page=1&limit=20
-```
+Clients, staff, and vehicles support `page`, `limit`, and `search`. Vehicles also support `cliente_id`. Service orders support `responsavel_id`, `cliente_id`, `veiculo_id`, `status`, `data_inicio_de`, `data_inicio_ate`, `valor_min`, `valor_max`, `sort`, `page`, and `limit`.
 
 ## Dashboard
 
@@ -279,158 +180,63 @@ Ordens de serviço aceitam:
 GET /api/v1/dashboard/resumo?de=2026-09-01&ate=2026-09-30
 ```
 
-Retorna ordens abertas, total de veículos, clientes ativos e receita do período.
+Returns open orders, total vehicles, active clients, and period revenue.
 
-## Usar a API em outro repositório
+## Use from another frontend repository
 
-O frontend não precisa estar dentro deste repositório. Mantenha os projetos separados:
+Keep the projects separate:
 
 ```text
-MWM-API/       -> servidor Node + PostgreSQL
-MWM-FRONTEND/  -> aplicação web que consome a API por HTTP
+MWM-API/       -> Node.js API and PostgreSQL integration
+MWM-FRONTEND/  -> web application consuming the API over HTTP
 ```
 
-Inicie a API neste repositório:
-
-```powershell
-cd caminho\para\MWM-API
-npm start
-```
-
-Depois, no repositório do frontend, use esta URL base:
+In the frontend repository:
 
 ```javascript
 const API_URL = 'http://localhost:3000/api/v1';
-```
+const TOKEN_KEY = 'mwm_access_token';
 
-O frontend pode usar Vite, Live Server, Python HTTP server ou qualquer outro servidor. As origens locais já permitidas são `http://localhost:5500` e `http://localhost:5173`. Para outra porta, adicione-a ao `CORS_ORIGIN` do `.env` da API e reinicie o servidor:
-
-```env
-CORS_ORIGIN=http://localhost:5500,http://localhost:5173,http://localhost:4200
-```
-
-Não abra o frontend diretamente com `file://`. Sirva-o por HTTP para que as requisições e o CORS funcionem.
-
-No repositório do frontend, guarde o token recebido no login e crie uma função comum para as requisições:
-
-```javascript
 async function apiFetch(path, options = {}) {
-	const token = localStorage.getItem('mwm_access_token');
-	const response = await fetch(`${API_URL}${path}`, {
-		...options,
-		headers: {
-			'Content-Type': 'application/json',
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-			...(options.headers || {})
-		}
-	});
-
-	if (!response.ok) {
-		const error = await response.json().catch(() => ({}));
-		throw new Error(error.error?.message || 'Erro na API.');
-	}
-
-	return response.status === 204 ? null : response.json();
+  const token = localStorage.getItem(TOKEN_KEY);
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  const payload = response.status === 204 ? null : await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error?.message || 'API request failed.');
+  return payload;
 }
 ```
 
-Login no frontend:
+The API allows frontend origins `http://localhost:5500` and `http://localhost:5173`. Add any other frontend origin to `CORS_ORIGIN` and restart the API. Serve the frontend over HTTP; do not open it with `file://`.
 
-```javascript
-const result = await apiFetch('/auth/login', {
-	method: 'POST',
-	body: JSON.stringify({
-		email: 'admin@oficina.com',
-		senha: 'senha-segura'
-	})
-});
-
-localStorage.setItem('mwm_access_token', result.access_token);
-```
-
-Listar veículos:
-
-```javascript
-const result = await apiFetch('/veiculos?limit=100');
-const veiculos = result.data;
-```
-
-Adicionar veículo:
-
-```javascript
-await apiFetch('/veiculos', {
-	method: 'POST',
-	body: JSON.stringify({
-		cliente_id: 1,
-		placa: 'XYZ2A34',
-		marca: 'Fiat',
-		modelo: 'Uno',
-		cor: 'Branco',
-		quilometragem: 45000,
-		carroceria: 'Hatch'
-	})
-});
-```
-
-Se o frontend for acessado por outro computador da rede, `localhost` não aponta para o computador da API. Use o IP da máquina que executa o Node, por exemplo:
-
-```javascript
-const API_URL = 'http://192.168.0.20:3000/api/v1';
-```
-
-Nesse caso, inclua a origem real do frontend no `CORS_ORIGIN` e libere a porta `3000` no firewall, se necessário. Em produção, substitua essa URL por um domínio HTTPS, como `https://api.sua-oficina.com/api/v1`.
-
-Durante o desenvolvimento, sirva o frontend estático em outra porta:
-
-```powershell
-cd ..\Mechanical-Workshop-Management-MWM-\frontend\home-page
-python -m http.server 5500
-```
-
-Abra `http://localhost:5500/home-page.html`. O CORS da API já permite essa origem.
-
-## Respostas de erro
-
-Os erros seguem este formato:
+## Error responses
 
 ```json
 {
-	"error": {
-		"code": "VALIDATION_ERROR",
-		"message": "Dados inválidos.",
-		"details": {
-			"cliente_id": ["Registro relacionado não encontrado."]
-		}
-	}
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid data.",
+    "details": { "cliente_id": ["Related record not found."] }
+  }
 }
 ```
 
-Status usados:
+The API uses `401` for authentication failures, `403` for authorization failures, `404` for missing records, `409` for duplicate records, `422` for invalid input or relationships, and `500` for unexpected errors.
 
-- `401`: token ausente ou inválido
-- `403`: usuário sem permissão
-- `404`: registro ou rota não encontrada
-- `409`: duplicidade, como CPF/CNPJ, matrícula ou placa
-- `422`: payload ou relacionamento inválido
-- `500`: erro interno
-
-## Estrutura do projeto
+## Project structure
 
 ```text
 app.js
 backend/
-	database.js
-	http.js
-	routes/
-		clients.js
-		staff.js
-		vehicles.js
-		service-orders.js
-	services/
-		clients.js
-		staff.js
-		vehicles.js
-		service-orders.js
-db/
-	database.sql
+  database.js
+  http.js
+  routes/
+  services/
+db/database.sql
 ```

@@ -6,15 +6,15 @@ const fields = ['titulo', 'cliente_id', 'veiculo_id', 'responsavel_id', 'status'
 async function validateReferences(input, requireMainFields = false) {
   const details = {};
   for (const field of ['titulo', 'cliente_id', 'veiculo_id', 'responsavel_id']) {
-    if (requireMainFields && (input[field] === undefined || input[field] === null || input[field] === '')) details[field] = ['Campo obrigatório.'];
+     if (requireMainFields && (input[field] === undefined || input[field] === null || input[field] === '')) details[field] = ['This field is required.'];
   }
-  if (input.status !== undefined && !statuses.includes(input.status)) details.status = ['Status inválido.'];
+  if (input.status !== undefined && !statuses.includes(input.status)) details.status = ['Invalid status.'];
   for (const [field, table] of [['cliente_id', 'clientes'], ['veiculo_id', 'veiculos'], ['responsavel_id', 'funcionarios']]) {
-    if (input[field] !== undefined && !(await findById(table, input[field]))) details[field] = ['Registro relacionado não encontrado.'];
+     if (input[field] !== undefined && !(await findById(table, input[field]))) details[field] = ['Related record not found.'];
   }
   if (input.cliente_id !== undefined && input.veiculo_id !== undefined) {
     const vehicle = await findById('veiculos', input.veiculo_id);
-    if (vehicle && Number(vehicle.cliente_id) !== Number(input.cliente_id)) details.veiculo_id = ['O veículo não pertence ao cliente informado.'];
+    if (vehicle && Number(vehicle.cliente_id) !== Number(input.cliente_id)) details.veiculo_id = ['The vehicle does not belong to the specified client.'];
   }
   return details;
 }

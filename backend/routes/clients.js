@@ -8,9 +8,9 @@ router.get('/:cliente_id/veiculos', asyncRoute(async (req, res) => {
 	const vehicles = await require('../services/vehicles').byClient(req.params.cliente_id);
 	res.json({ data: vehicles.rows, meta: { total: vehicles.rowCount } });
 }));
-router.get('/:id', asyncRoute(async (req, res) => { const row = await service.findById(req.params.id); return row ? res.json(row) : errorResponse(res, 404, 'NOT_FOUND', 'Cliente não encontrado.'); }));
-router.post('/', asyncRoute(async (req, res) => { const details = validateRequired(req.body || {}, ['nome', 'cpf_cnpj']); if (Object.keys(details).length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Dados inválidos.', details); res.status(201).json(await service.create(req.body)); }));
-router.patch('/:id', asyncRoute(async (req, res) => { const row = await service.update(req.params.id, req.body || {}); return row ? res.json(row) : errorResponse(res, 404, 'NOT_FOUND', 'Cliente não encontrado ou sem campos para atualizar.'); }));
-router.delete('/:id', adminOnly, asyncRoute(async (req, res) => { const result = await service.remove(req.params.id); return result.rowCount ? res.status(204).send() : errorResponse(res, 404, 'NOT_FOUND', 'Cliente não encontrado.'); }));
+router.get('/:id', asyncRoute(async (req, res) => { const row = await service.findById(req.params.id); return row ? res.json(row) : errorResponse(res, 404, 'NOT_FOUND', 'Client not found.'); }));
+router.post('/', asyncRoute(async (req, res) => { const details = validateRequired(req.body || {}, ['nome', 'cpf_cnpj']); if (Object.keys(details).length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Invalid data.', details); res.status(201).json(await service.create(req.body)); }));
+router.patch('/:id', asyncRoute(async (req, res) => { const row = await service.update(req.params.id, req.body || {}); return row ? res.json(row) : errorResponse(res, 404, 'NOT_FOUND', 'Client not found or no fields to update.'); }));
+router.delete('/:id', adminOnly, asyncRoute(async (req, res) => { const result = await service.remove(req.params.id); return result.rowCount ? res.status(204).send() : errorResponse(res, 404, 'NOT_FOUND', 'Client not found.'); }));
 
 module.exports = router;

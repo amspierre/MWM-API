@@ -22,7 +22,7 @@ app.use(helmet());
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: '1mb' }));
 
-// Rotas separadas por recurso. Os endpoints antigos abaixo permanecem como compatibilidade.
+// Resource routes are mounted separately. Legacy handlers remain for compatibility.
 app.use('/api/v1/clientes', clientsRoutes);
 app.use('/api/v1/funcionarios', staffRoutes);
 app.use('/api/v1/veiculos', vehiclesRoutes);
@@ -45,8 +45,8 @@ function asyncRoute(handler) {
 function validateBody(body, fields) {
   const details = {};
   for (const [field, rule] of Object.entries(fields)) {
-    if (rule.required && (body[field] === undefined || body[field] === null || body[field] === '')) details[field] = ['Campo obrigatório.'];
-    else if (body[field] !== undefined && rule.type && typeof body[field] !== rule.type) details[field] = [`Deve ser do tipo ${rule.type}.`];
+    if (rule.required && (body[field] === undefined || body[field] === null || body[field] === '')) details[field] = ['This field is required.'];
+    else if (body[field] !== undefined && rule.type && typeof body[field] !== rule.type) details[field] = [`Must be of type ${rule.type}.`];
   }
   return details;
 }
@@ -60,13 +60,13 @@ function pagination(query) {
 function auth(required = true) {
   return (req, res, next) => {
     const header = req.headers.authorization || '';
-    if (!header.startsWith('Bearer ')) return required ? errorResponse(res, 401, 'UNAUTHENTICATED', 'Autenticação necessária.') : next();
-    try { req.user = jwt.verify(header.slice(7), jwtSecret); return next(); } catch { return errorResponse(res, 401, 'INVALID_TOKEN', 'Token inválido ou expirado.'); }
+    if (!header.startsWith('Bearer ')) return required ? errorResponse(res, 401, 'UNAUTHENTICATED', 'Authentication required.') : next();
+    try { req.user = jwt.verify(header.slice(7), jwtSecret); return next(); } catch { return errorResponse(res, 401, 'INVALID_TOKEN', 'Invalid or expired token.'); }
   };
 }
 
 function adminOnly(req, res, next) {
-  return req.user?.perfil === 'admin' ? next() : errorResponse(res, 403, 'FORBIDDEN', 'Permissão insuficiente.');
+  return req.user?.perfil === 'admin' ? next() : errorResponse(res, 403, 'FORBIDDEN', 'Insufficient permissions.');
 }
 
 async function findById(table, id) {
@@ -83,14 +83,14 @@ app.get('/health', asyncRoute(async (req, res) => { await pool.query('SELECT 1')
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true });
 app.post('/api/v1/auth/login', loginLimiter, asyncRoute(async (req, res) => {
   const { email, senha } = req.body || {};
-  if (!email || !senha) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Email e senha são obrigatórios.');
+  if (!email || !senha) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Email and password are required.');
   const result = await pool.query('SELECT * FROM usuarios WHERE email = $1 AND ativo = TRUE', [email]);
   const user = result.rows[0];
-  if (!user || !(await bcrypt.compare(senha, user.senha_hash))) return errorResponse(res, 401, 'INVALID_CREDENTIALS', 'Credenciais inválidas.');
+  if (!user || !(await bcrypt.compare(senha, user.senha_hash))) return errorResponse(res, 401, 'INVALID_CREDENTIALS', 'Invalid credentials.');
   const token = jwt.sign({ id: user.id, nome: user.nome, email: user.email, perfil: user.perfil }, jwtSecret, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
   res.json({ access_token: token, token_type: 'Bearer', usuario: publicUser(user) });
 }));
-app.get('/api/v1/auth/me', auth(), asyncRoute(async (req, res) => { const user = await findById('usuarios', req.user.id); if (!user || !user.ativo) return errorResponse(res, 401, 'UNAUTHENTICATED', 'Usuário inválido.'); res.json({ usuario: publicUser(user) }); }));
+app.get('/api/v1/auth/me', auth(), asyncRoute(async (req, res) => { const user = await findById('usuarios', req.user.id); if (!user || !user.ativo) return errorResponse(res, 401, 'UNAUTHENTICATED', 'Invalid user.'); res.json({ usuario: publicUser(user) }); }));
 app.post('/api/v1/auth/logout', auth(), (req, res) => res.status(204).send());
 
 const simpleResources = {
@@ -110,26 +110,26 @@ for (const [resource, config] of Object.entries(simpleResources)) {
     const rows = await pool.query(`SELECT * FROM ${config.table} ${condition} ORDER BY id LIMIT $${values.length - 1} OFFSET $${values.length}`, values);
     res.json({ data: rows.rows, meta: { page, limit, total: count.rows[0].total, pages: Math.ceil(count.rows[0].total / limit) } });
   }));
-  app.get(`${base}/:id`, auth(), asyncRoute(async (req, res) => { const row = await findById(config.table, req.params.id); return row ? res.json(row) : errorResponse(res, 404, 'NOT_FOUND', 'Registro não encontrado.'); }));
+  app.get(`${base}/:id`, auth(), asyncRoute(async (req, res) => { const row = await findById(config.table, req.params.id); return row ? res.json(row) : errorResponse(res, 404, 'NOT_FOUND', 'Record not found.'); }));
   app.post(base, auth(), config.admin ? adminOnly : (req, res, next) => next(), asyncRoute(async (req, res) => {
-    const details = validateBody(req.body || {}, Object.fromEntries(config.required.map((field) => [field, { required: true }]))); if (Object.keys(details).length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Dados inválidos.', details);
+    const details = validateBody(req.body || {}, Object.fromEntries(config.required.map((field) => [field, { required: true }]))); if (Object.keys(details).length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Invalid data.', details);
     const input = { ...req.body }; if (resource === 'veiculos') input.placa = String(input.placa).toUpperCase(); const fields = config.fields.filter((field) => input[field] !== undefined); const values = fields.map((field) => input[field]);
     const result = await pool.query(`INSERT INTO ${config.table} (${fields.join(',')}) VALUES (${fields.map((_, i) => `$${i + 1}`).join(',')}) RETURNING *`, values); res.status(201).json(result.rows[0]);
   }));
   app.patch(`${base}/:id`, auth(), config.admin ? adminOnly : (req, res, next) => next(), asyncRoute(async (req, res) => {
-    const input = { ...req.body }; if (resource === 'veiculos' && input.placa) input.placa = String(input.placa).toUpperCase(); const fields = config.fields.filter((field) => input[field] !== undefined); if (!fields.length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Nenhum campo para atualizar.');
-    const values = fields.map((field) => input[field]); values.push(req.params.id); const result = await pool.query(`UPDATE ${config.table} SET ${fields.map((field, i) => `${field} = $${i + 1}`).join(', ')} WHERE id = $${values.length} RETURNING *`, values); return result.rows[0] ? res.json(result.rows[0]) : errorResponse(res, 404, 'NOT_FOUND', 'Registro não encontrado.');
+    const input = { ...req.body }; if (resource === 'veiculos' && input.placa) input.placa = String(input.placa).toUpperCase(); const fields = config.fields.filter((field) => input[field] !== undefined); if (!fields.length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'No fields to update.');
+    const values = fields.map((field) => input[field]); values.push(req.params.id); const result = await pool.query(`UPDATE ${config.table} SET ${fields.map((field, i) => `${field} = $${i + 1}`).join(', ')} WHERE id = $${values.length} RETURNING *`, values); return result.rows[0] ? res.json(result.rows[0]) : errorResponse(res, 404, 'NOT_FOUND', 'Record not found.');
   }));
-  app.delete(`${base}/:id`, auth(), config.admin ? adminOnly : (req, res, next) => next(), asyncRoute(async (req, res) => { const result = await pool.query(`DELETE FROM ${config.table} WHERE id = $1`, [req.params.id]); return result.rowCount ? res.status(204).send() : errorResponse(res, 404, 'NOT_FOUND', 'Registro não encontrado.'); }));
+  app.delete(`${base}/:id`, auth(), config.admin ? adminOnly : (req, res, next) => next(), asyncRoute(async (req, res) => { const result = await pool.query(`DELETE FROM ${config.table} WHERE id = $1`, [req.params.id]); return result.rowCount ? res.status(204).send() : errorResponse(res, 404, 'NOT_FOUND', 'Record not found.'); }));
 }
 
 app.get('/api/v1/clientes/:cliente_id/veiculos', auth(), asyncRoute(async (req, res) => { const result = await pool.query('SELECT * FROM veiculos WHERE cliente_id = $1 ORDER BY id', [req.params.cliente_id]); res.json({ data: result.rows, meta: { total: result.rowCount } }); }));
 
 async function validateOrderReferences(body) {
   const details = validateBody(body, { titulo: { required: true }, cliente_id: { required: true }, veiculo_id: { required: true }, responsavel_id: { required: true } });
-  if (body.status !== undefined && !statuses.includes(body.status)) details.status = ['Status inválido.'];
-  for (const [field, table] of [['cliente_id', 'clientes'], ['veiculo_id', 'veiculos'], ['responsavel_id', 'funcionarios']]) if (body[field] !== undefined && !(await findById(table, body[field]))) details[field] = ['Registro relacionado não encontrado.'];
-  if (body.cliente_id && body.veiculo_id) { const vehicle = await findById('veiculos', body.veiculo_id); if (vehicle && Number(vehicle.cliente_id) !== Number(body.cliente_id)) details.veiculo_id = ['O veículo não pertence ao cliente informado.']; }
+  if (body.status !== undefined && !statuses.includes(body.status)) details.status = ['Invalid status.'];
+  for (const [field, table] of [['cliente_id', 'clientes'], ['veiculo_id', 'veiculos'], ['responsavel_id', 'funcionarios']]) if (body[field] !== undefined && !(await findById(table, body[field]))) details[field] = ['Related record not found.'];
+  if (body.cliente_id && body.veiculo_id) { const vehicle = await findById('veiculos', body.veiculo_id); if (vehicle && Number(vehicle.cliente_id) !== Number(body.cliente_id)) details.veiculo_id = ['The vehicle does not belong to the specified client.']; }
   return details;
 }
 
@@ -143,12 +143,12 @@ app.get('/api/v1/ordens-servico', auth(), asyncRoute(async (req, res) => {
   const count = await pool.query(`SELECT COUNT(*)::int AS total FROM ordens_servico ${condition}`, values); values.push(limit, offset); const rows = await pool.query(`SELECT * FROM ordens_servico ${condition} ORDER BY ${order} NULLS LAST LIMIT $${values.length - 1} OFFSET $${values.length}`, values);
   res.json({ data: rows.rows, meta: { page, limit, total: count.rows[0].total, pages: Math.ceil(count.rows[0].total / limit) } });
 }));
-app.get('/api/v1/ordens-servico/:id', auth(), asyncRoute(async (req, res) => { const row = await findById('ordens_servico', req.params.id); return row ? res.json(row) : errorResponse(res, 404, 'NOT_FOUND', 'Registro não encontrado.'); }));
+app.get('/api/v1/ordens-servico/:id', auth(), asyncRoute(async (req, res) => { const row = await findById('ordens_servico', req.params.id); return row ? res.json(row) : errorResponse(res, 404, 'NOT_FOUND', 'Record not found.'); }));
 
 async function saveOrder(req, res) {
-  const existing = req.params.id ? await findById('ordens_servico', req.params.id) : null; if (req.params.id && !existing) return errorResponse(res, 404, 'NOT_FOUND', 'Ordem não encontrada.');
-  const body = existing ? { ...existing, ...req.body } : req.body || {}; const details = await validateOrderReferences(body); if (Object.keys(details).length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Dados inválidos.', details);
-  const entries = orderEntries(req.body || {}); if (req.params.id && !entries.length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Nenhum campo para atualizar.');
+  const existing = req.params.id ? await findById('ordens_servico', req.params.id) : null; if (req.params.id && !existing) return errorResponse(res, 404, 'NOT_FOUND', 'Service order not found.');
+  const body = existing ? { ...existing, ...req.body } : req.body || {}; const details = await validateOrderReferences(body); if (Object.keys(details).length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'Invalid data.', details);
+  const entries = orderEntries(req.body || {}); if (req.params.id && !entries.length) return errorResponse(res, 422, 'VALIDATION_ERROR', 'No fields to update.');
   if (req.params.id && req.body.status === 'finalizado' && existing.status !== 'finalizado') { const end = req.body.data_fim || new Date().toISOString(); entries.push(['data_fim', end], ['tempo_decorrido_minutos', Math.max(0, Math.round((new Date(end) - new Date(body.data_inicio)) / 60000))]); }
   if (req.params.id && req.body.status && req.body.status !== 'finalizado') entries.push(['data_fim', null], ['tempo_decorrido_minutos', 0]);
   const fields = entries.map(([field]) => field); const values = entries.map(([, value]) => value);
@@ -156,7 +156,7 @@ async function saveOrder(req, res) {
   values.push(req.params.id); const result = await pool.query(`UPDATE ordens_servico SET ${fields.map((field, i) => `${field} = $${i + 1}`).join(', ')} WHERE id = $${values.length} RETURNING *`, values); return res.json(result.rows[0]);
 }
 app.post('/api/v1/ordens-servico', auth(), asyncRoute(saveOrder)); app.patch('/api/v1/ordens-servico/:id', auth(), asyncRoute(saveOrder)); app.patch('/api/v1/ordens-servico/:id/status', auth(), asyncRoute((req, res) => saveOrder({ ...req, body: { status: req.body?.status } }, res)));
-app.delete('/api/v1/ordens-servico/:id', auth(), asyncRoute(async (req, res) => { const result = await pool.query('DELETE FROM ordens_servico WHERE id = $1', [req.params.id]); return result.rowCount ? res.status(204).send() : errorResponse(res, 404, 'NOT_FOUND', 'Ordem não encontrada.'); }));
+app.delete('/api/v1/ordens-servico/:id', auth(), asyncRoute(async (req, res) => { const result = await pool.query('DELETE FROM ordens_servico WHERE id = $1', [req.params.id]); return result.rowCount ? res.status(204).send() : errorResponse(res, 404, 'NOT_FOUND', 'Service order not found.'); }));
 
 app.get('/api/v1/dashboard/resumo', auth(), asyncRoute(async (req, res) => {
   const from = req.query.de || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10); const to = req.query.ate || new Date().toISOString().slice(0, 10);
@@ -164,8 +164,8 @@ app.get('/api/v1/dashboard/resumo', auth(), asyncRoute(async (req, res) => {
   res.json({ ...result.rows[0], periodo: { de: from, ate: to }, receita_periodo: Number(result.rows[0].receita_periodo) });
 }));
 
-app.use((req, res) => errorResponse(res, 404, 'NOT_FOUND', 'Rota não encontrada.'));
-app.use((error, req, res, next) => { console.error(error); if (error.code === '23505') return errorResponse(res, 409, 'CONFLICT', 'Registro duplicado.'); if (error.code === '23503') return errorResponse(res, 422, 'VALIDATION_ERROR', 'Registro relacionado não encontrado.'); return errorResponse(res, 500, 'INTERNAL_ERROR', 'Erro interno do servidor.'); });
+app.use((req, res) => errorResponse(res, 404, 'NOT_FOUND', 'Route not found.'));
+app.use((error, req, res, next) => { console.error(error); if (error.code === '23505') return errorResponse(res, 409, 'CONFLICT', 'Duplicate record.'); if (error.code === '23503') return errorResponse(res, 422, 'VALIDATION_ERROR', 'Related record not found.'); return errorResponse(res, 500, 'INTERNAL_ERROR', 'Internal server error.'); });
 
-if (require.main === module) app.listen(port, () => console.log(`MWM API disponível em http://localhost:${port}`));
+if (require.main === module) app.listen(port, () => console.log(`MWM API available at http://localhost:${port}`));
 module.exports = { app, pool };

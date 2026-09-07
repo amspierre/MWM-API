@@ -11,18 +11,18 @@ function asyncRoute(handler) {
 function auth() {
   return (req, res, next) => {
     const header = req.headers.authorization || '';
-    if (!header.startsWith('Bearer ')) return errorResponse(res, 401, 'UNAUTHENTICATED', 'Autenticação necessária.');
+    if (!header.startsWith('Bearer ')) return errorResponse(res, 401, 'UNAUTHENTICATED', 'Authentication required.');
     try {
       req.user = jwt.verify(header.slice(7), process.env.JWT_SECRET || 'development-only-secret');
       return next();
     } catch {
-      return errorResponse(res, 401, 'INVALID_TOKEN', 'Token inválido ou expirado.');
+      return errorResponse(res, 401, 'INVALID_TOKEN', 'Invalid or expired token.');
     }
   };
 }
 
 function adminOnly(req, res, next) {
-  return req.user?.perfil === 'admin' ? next() : errorResponse(res, 403, 'FORBIDDEN', 'Permissão insuficiente.');
+  return req.user?.perfil === 'admin' ? next() : errorResponse(res, 403, 'FORBIDDEN', 'Insufficient permissions.');
 }
 
 function pagination(query) {
@@ -34,7 +34,7 @@ function pagination(query) {
 function validateRequired(body, fields) {
   const details = {};
   for (const field of fields) {
-    if (body[field] === undefined || body[field] === null || body[field] === '') details[field] = ['Campo obrigatório.'];
+    if (body[field] === undefined || body[field] === null || body[field] === '') details[field] = ['This field is required.'];
   }
   return details;
 }

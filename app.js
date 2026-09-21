@@ -16,10 +16,10 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const jwtSecret = process.env.JWT_SECRET || 'development-only-secret';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5500').split(',').map((origin) => origin.trim());
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5500,http://127.0.0.1:5500').split(',').map((origin) => origin.trim());
 
 app.use(helmet());
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: '1mb' }));
 
 // Resource routes are mounted separately. Legacy handlers remain for compatibility.
